@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>简易自动售货机</title>
+    <style>
+        .container { width: 800px; margin: 20px auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { padding: 8px 15px; cursor: pointer; }
+        input { margin: 0 5px; padding: 6px; }
+        select { margin: 0 5px; padding: 6px; } /* 给下拉选框加样式，和输入框对齐 */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+        .tip { color: red; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>自动售货系统</h1>
+        <div class="section">
+            <h3>当前商品列表</h3>
+            <button onclick="sellingMachine.listProducts()">刷新商品列表</button>
+            <table id="productTable">
+                <tr>
+                    <th>商品</th>
+                    <th>单价（元）</th>
+                    <th>库存（件）</th>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <h3>补货操作</h3>
+            <select id="replenishSelect"></select>
+            补货数量：<input type="number" id="replenishNum" placeholder="输入正整数" min="1">
+            <button onclick="replenishProduct()">确认补货</button>
+            <div class="tip" id="replenishTip"></div>
+        </div>
+
+        <!-- 销售操作区：下拉选框ID改为sellSelect -->
+        <div class="section">
+            <h3>购买商品</h3>
+            <select id="sellSelect"></select>
+            购买数量：<input type="number" id="sellNum" placeholder="输入正整数" min="1">
+            支付金额：<input type="number" id="sellMoney" placeholder="输入支付金额" min="0">
+            <button onclick="sellProduct()">确认购买</button>
+            <div class="tip" id="sellTip"></div>
+        </div>
+    </div>
+
+    <script>
+        // 1. 商品类（Product）
+        class Product {
+            constructor(name, price, stock) {
+                this.name = name;
+                this.price = price;
+                this.stock = stock;
+            }
+        }
+
+        // 2. 售货机类（SellingMachine）
+        class SellingMachine {
+            constructor() {
+                this.products = [
+                    new Product("可乐", 3.5, 20),
+                    new Product("雪碧", 3.5, 15),
+                    new Product("薯片", 6.0, 10),
+                    new Product("巧克力", 8.5, 8)
+                ];
+            }
+
+            listProducts() {
+                const table = document.getElementById("productTable");
+                table.innerHTML = `
+                    <tr>
+                        <th>商品名称</th>
+                        <th>单价（元）</th>
+                        <th>库存（件）</th>
+                    </tr>
+                `;
+                for (let product of this.products) {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${product.name}</td>
+                        <td>${product.price.toFixed(2)}</td>
+                        <td>${product.stock}</td>
+                    `;
+                    table.appendChild(tr);
+                }
+            }
+
+            replenish(name, num) {
+                let product = this.products.find(p => p.name.toLowerCase() === name.toLowerCase());
+                if (!product) {
+                    return `补货失败：未找到【${name}】商品`;
+                }
+                product.stock += parseInt(num);
+                return `补货成功：【${name}】当前库存更新为 ${product.stock} 件`;
+            }
+
+            sell(name, num, money) {
+                let product = this.products.find(p => p.name.toLowerCase() === name.toLowerCase());
+                if (!product) {
+                    return `购买失败：未找到【${name}】商品`;
+                }
+                num = parseInt(num);
+                money = parseFloat(money);
+                if (product.stock < num) {
+                    return `购买失败：【${name}】库存不足，当前仅存 ${product.stock} 件`;
+                }
+                const totalPrice = product.price * num;
+                if (money < totalPrice) {
+                    return `购买失败：支付金额不足！需支付 ${totalPrice.toFixed(2)} 元，您仅支付 ${money.toFixed(2)} 元`;
+                }
+                product.stock -= num;
+                const change = money - totalPrice;
+                return `购买成功！您购买了 ${num} 件【${name}】，找零 ${change.toFixed(2)} 元`;
+            }
+        }
+
+        // 3. 创建售货机对象
+        const sellingMachine = new SellingMachine();
+
+        // 生成下拉选框选项
+        function renderProductOptions() {
+            const replenishSelect = document.getElementById("replenishSelect");
+            const sellSelect = document.getElementById("sellSelect");
+            replenishSelect.innerHTML = "";
+            sellSelect.innerHTML = "";
+            for (let product of sellingMachine.products) {
+                const option = document.createElement("option");
+                option.value = product.name;
+                option.textContent = product.name;
+                replenishSelect.appendChild(option);
+                sellSelect.appendChild(option.cloneNode(true));
+            }
+        }
+
+        // 合并window.onload（只保留一个）
+        window.onload = function() {
+            sellingMachine.listProducts();
+            renderProductOptions(); // 调用生成下拉选项的函数
+        };
+
+        // 5. 补货按钮事件
+        function replenishProduct() {
+            // 改为从下拉选框取商品名
+            const name = document.getElementById("replenishSelect").value;
+            const num = document.getElementById("replenishNum").value.trim();
+            const tip = document.getElementById("replenishTip");
+
+            if (!num || isNaN(num) || parseInt(num) <= 0) {
+                tip.textContent = "补货数量必须是正整数！";
+                return;
+            }
+
+            const result = sellingMachine.replenish(name, num);
+            tip.textContent = result;
+            sellingMachine.listProducts();
+            // 去掉清空replenishName的代码（因为这个输入框已经删掉了）
+            document.getElementById("replenishNum").value = "";
+        }
+
+        // 6. 销售按钮事件
+        function sellProduct() {
+            const name = document.getElementById("sellSelect").value;
+            const num = document.getElementById("sellNum").value.trim();
+            const money = document.getElementById("sellMoney").value.trim();
+            const tip = document.getElementById("sellTip");
+
+            if (!num || isNaN(num) || parseInt(num) <= 0) {
+                tip.textContent = "购买数量必须是正整数！";
+                return;
+            }
+            if (!money || isNaN(money) || parseFloat(money) < 0) {
+                tip.textContent = "支付金额必须是大于等于 0 的数字！";
+                return;
+            }
+
+            const result = sellingMachine.sell(name, num, money);
+            tip.textContent = result;
+            sellingMachine.listProducts();
+            document.getElementById("sellNum").value = "";
+            document.getElementById("sellMoney").value = "";
+        }
+    </script>
+</body>
+</html>
